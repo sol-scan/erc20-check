@@ -5,7 +5,7 @@ from slither import Slither
 
 if __name__ == "__main__":
     
-    slither = Slither('test/erc20.sol')
+    slither = Slither('temp/erc20.sol')
     for c in slither.contracts_derived:
         erc20_check = Erc20Check(c)
         erc20_check.check_close()

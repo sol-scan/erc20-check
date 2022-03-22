@@ -15,7 +15,7 @@ class Erc20CheckBase:
         self.states: Mapping[str, StateVariable] = {}
         self.funcs_write_state: Mapping[str, List[Function]] = {}
         # 根据调用情况查询某一可达到的方法列表
-        self.funcs_to_reachable_funcs: Mapping[str, List[Function]] = {}
+        self.func_to_reachable_funcs: Mapping[str, List[Function]] = {}
         # self.func_to_reachable_paths: Mapping[str,Mapping[str,List[Function]]] = {}
 
         self.funcs[TOTAL_SUPPLY] = c.get_function_from_signature(
@@ -43,8 +43,8 @@ class Erc20CheckBase:
             self.states[ALLOWANCE])
 
     # 迭代获取方法可达到的方法列表
-    def __func_to_reachable_funcs(self,f:Function)->List[Function]:
-        if  f.full_name not in self.funcs_to_reachable_funcs:
+    def _func_to_reachable_funcs(self,f:Function)->List[Function]:
+        if  f.full_name not in self.func_to_reachable_funcs:
             res = [f]
             all_internal_calls = f.all_internal_calls()
             all_solidity_calls = f.all_solidity_calls()
@@ -52,16 +52,16 @@ class Erc20CheckBase:
                 call for call in all_internal_calls if call not in all_solidity_calls]
             modifies = f.modifiers
             for ff in internal_calls + modifies:
-                res.extend(self.__func_to_reachable_funcs(ff))
-            self.funcs_to_reachable_funcs[f.full_name] = list(set(res))
-        return self.funcs_to_reachable_funcs[f.full_name]
+                res.extend(self._func_to_reachable_funcs(ff))
+            self.func_to_reachable_funcs[f.full_name] = list(set(res))
+        return self.func_to_reachable_funcs[f.full_name]
 
     # 获取哪些可外部访问的方法对指定state进行了写操作
     def __get_funcs_write_the_state(self, s: StateVariable) -> List[Function]:
         fs = []
         for f in self.c.functions_entry_points:
             if not f.is_constructor:
-                for ff in self.__func_to_reachable_funcs(f):
+                for ff in self._func_to_reachable_funcs(f):
                     if s in ff.state_variables_written:
                         fs.append(f)
                         break
@@ -70,7 +70,7 @@ class Erc20CheckBase:
     # 判断某方法是否只读取了指定的state
     def _func_only_op_state(self, f: Function, is_write:bool, obj_indexs: List) -> bool:
         indexs = []
-        for ff in self.__func_to_reachable_funcs(f):
+        for ff in self._func_to_reachable_funcs(f):
             indexs.extend(ff.state_variables_written if is_write else ff.state_variables_read)
         indexs = list(set(indexs))
 

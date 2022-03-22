@@ -51,7 +51,7 @@ class Erc20Check(Erc20CheckBase):
             False,
             [
                 [SolidityVariableComposed("msg.sender")],
-                [self.funcs[TRANSFER].parameters[1]]
+                [self.funcs[TRANSFER].parameters[0]]
             ]
         )
         self._check_mapping_detail(
@@ -60,7 +60,7 @@ class Erc20Check(Erc20CheckBase):
             True,
             [
                 [SolidityVariableComposed("msg.sender")],
-                [self.funcs[TRANSFER].parameters[1]]
+                [self.funcs[TRANSFER].parameters[0]]
             ]
         )
 
