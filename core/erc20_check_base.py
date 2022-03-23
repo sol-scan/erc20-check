@@ -154,6 +154,13 @@ class Erc20CheckBase:
                     return True
         return False
     
+    # 根据 node、起始i、mapping、获取mapping的索引
+    def __get_mapping_index_v(self, n:Node, start_i:int, m_v):
+        for i in range(start_i, len(n.irs)):
+            ir = n.irs[i]
+            if isinstance(ir, Index) and ir.variable_left == m_v:
+                return self.__get_v_maybe_msgSender_func(n,i,ir.variable_right),ir.lvalue,i+1
+        assert False
         
     # 获取方法对mapping变量读写的细节
     def __get_mapping_indexs_op_by_func(self,f:Function,s:StateVariable,is_write:bool,depth:int)->List[List]:
@@ -163,11 +170,12 @@ class Erc20CheckBase:
             for i in range(len(n.irs)):
                 ir = n.irs[i]
                 if isinstance(ir, Index) and ir.variable_left == s:
-                    indexs = []
-                    # 假设第一个索引可能为调用，后面都不是
-                    indexs.append(self.__get_v_maybe_msgSender_func(n,i,ir.variable_right))
-                    for j in range(1,depth):
-                        indexs.append(n.irs[i+j].variable_right)
+                    indexs = [self.__get_v_maybe_msgSender_func(n,i,ir.variable_right)]
+                    # 递推获取索引
+                    m_v, next_start_i = ir.lvalue, i+1
+                    for _ in range(1,depth):
+                        m_k, m_v, next_start_i = self.__get_mapping_index_v(n,next_start_i,m_v)
+                        indexs.append(m_k)
                     indexss.append(indexs)
                 if isinstance(ir,InternalCall) :
                     ic_rets = self.__get_mapping_indexs_op_by_func(ir.function,s,is_write,depth)
