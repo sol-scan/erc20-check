@@ -3,7 +3,7 @@ from slither.core.declarations import Contract, Function, SolidityVariableCompos
 from slither.core.variables.state_variable import StateVariable
 from slither.core.variables.local_variable import LocalVariable
 from slither.core.cfg.node import NodeType,Node
-from slither.slithir.operations import InternalCall,Index,Binary,BinaryType,SolidityCall
+from slither.slithir.operations import InternalCall,Index,Binary,BinaryType,SolidityCall,LibraryCall
 from slither.slithir.variables import TemporaryVariable
 
 from .const import *
@@ -50,8 +50,12 @@ class Erc20CheckBase:
             all_solidity_calls = f.all_solidity_calls()
             internal_calls = [
                 call for call in all_internal_calls if call not in all_solidity_calls]
-            modifies = f.modifiers
-            for ff in internal_calls + modifies:
+            modifiers = f.modifiers
+            
+            for ff in internal_calls + modifiers:
+                if ff.contract_declarer.kind == "library":
+                    # 在调用父合约的方法时，父合约中本来的LibraryCall调用也出现在了internal_calls
+                    continue
                 res.extend(self._func_to_reachable_funcs(ff))
             self.func_to_reachable_funcs[f.full_name] = list(set(res))
         return self.func_to_reachable_funcs[f.full_name]

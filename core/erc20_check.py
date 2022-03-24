@@ -1,5 +1,5 @@
 from typing import List, Mapping, Tuple
-from slither.core.declarations import Contract, Function
+from slither.core.declarations import Contract, Function, FunctionContract
 from slither.core.declarations.solidity_variables import SolidityVariableComposed
 from slither.slithir.operations import InternalCall,Index,Binary,BinaryType,HighLevelCall,LowLevelCall
 from slither.slithir.variables.variable import Variable
@@ -116,14 +116,18 @@ class Erc20Check(Erc20CheckBase):
 
     # 溢出检查
     # 1、编译器版本高于0.8.0
-    # 2、使用库，这样的话，合约中并没有算术运算
+    # 2、使用库，这样的话，合约中并没有算术运算（只检查标准方法）
     def check_overflow(self):
         if self.c.compilation_unit.solc_version >= "0.8.0":
             return
         
         funcs = []
-        for f in set(self.funcs_write_state[BALANCE_OF] + self.funcs_write_state[ALLOWANCE]):
-            funcs.extend(self._func_to_reachable_funcs(f))
+        # for f in set(self.funcs_write_state[BALANCE_OF] + self.funcs_write_state[ALLOWANCE]):
+        #     funcs.extend(self._func_to_reachable_funcs(f))
+        # funcs = list(set(funcs))
+        for key in [TRANSFER, APPROVE, TRANSFER_FROM, BURN, INCREASE_ALLOWANCE,DECREASE_ALLOWANCE]:
+            if key in self.funcs:
+                funcs.extend(self._func_to_reachable_funcs(self.funcs[key]))
         funcs = list(set(funcs))
         for f in funcs:
             for n in f.nodes:
@@ -134,9 +138,9 @@ class Erc20Check(Erc20CheckBase):
                         BinaryType.MULTIPLICATION,
                         BinaryType.POWER
                     ]:
-                        if isinstance(ir.variable_left,Variable) and isinstance(ir.variable_right,Variable):
-                            print(" {} : {} 存在溢出风险".format(f.name,n.expression))
-                            break
+                        # if isinstance(ir.variable_left,Variable) and isinstance(ir.variable_right,Variable):
+                        print(" {} : {} : {} 存在溢出风险".format(f.contract_declarer.name,f.name,n.expression))
+                        break
 
     # 对可写balance和allowance的入口方法进行外部调用检查
     def check_call_other_contract(self):
