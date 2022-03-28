@@ -152,6 +152,9 @@ class Erc20Check(Erc20CheckBase):
             for node in f.nodes:
                 for ir in node.irs:
                     if isinstance(ir, LowLevelCall | HighLevelCall):
+                        if ir.function.contract_declarer.kind == "library":
+                            # library不算外部调用
+                            continue
                         print(" {} 方法中的 {} 存在外部调用风险".format(f.name,node.expression))
 
     def check_sstore(self):
@@ -162,5 +165,8 @@ class Erc20Check(Erc20CheckBase):
         for f in funcs:
             self._func_has_asm_sstore(f)
             self._func_has_asm_sload(f)
+
+    def check_fake_recharge(self):
+        self._check_fake_recharge(self.funcs[TRANSFER])
 
 

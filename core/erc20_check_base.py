@@ -1,10 +1,9 @@
 from typing import List, Mapping, Tuple
 from slither.core.declarations import Contract, Function, SolidityVariableComposed
 from slither.core.variables.state_variable import StateVariable
-from slither.core.variables.local_variable import LocalVariable
 from slither.core.cfg.node import NodeType,Node
-from slither.slithir.operations import InternalCall,Index,Binary,BinaryType,SolidityCall,LibraryCall
-from slither.slithir.variables import TemporaryVariable
+from slither.slithir.operations import InternalCall,Index,SolidityCall,Return
+from slither.slithir.variables import TemporaryVariable,Constant
 
 from .const import *
 
@@ -208,3 +207,22 @@ class Erc20CheckBase:
             if n.type == NodeType.RETURN:
                 return_nodes.append(n)
         return len(return_nodes) == 1 and str(return_nodes[0].expression)=="msg.sender"
+
+
+    # 假充值检查，transfer返回FALSE时存在假充值风险
+    def _check_fake_recharge(self, f:Function):
+        intercall_irs = []
+        for n in f.nodes:
+            for ir in n.irs:
+                if isinstance(ir, InternalCall):
+                    intercall_irs.append(ir)
+                if isinstance(ir, Return):
+                    ret_value = ir.values[0]
+                    if type(ret_value) == Constant:                    
+                        if ret_value == False:
+                            print("存在假充值风险")
+                    else:
+                        for intercall_ir in intercall_irs:
+                            the_ir:InternalCall = intercall_ir
+                            if the_ir.lvalue == ret_value:
+                                self._check_fake_recharge(the_ir.function)
