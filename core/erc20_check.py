@@ -13,107 +13,52 @@ class Erc20Check(Erc20CheckBase):
 
 
     def check_close(self):
-        self._check_close(
-            BALANCE_OF,
-            [TRANSFER, TRANSFER_FROM],
-            [BURN]
-        )
-        self._check_close(
-            ALLOWANCE,
-            [APPROVE, TRANSFER_FROM],
-            [INCREASE_ALLOWANCE, DECREASE_ALLOWANCE]
-        )
-    
-    def check_standard_func(self):
-        lst = [
-            [TRANSFER, READ_FLAG, [BALANCE_OF]],
-            [TRANSFER, WRITE_FLAG, [BALANCE_OF]],
-            [APPROVE, READ_FLAG, []],
-            [APPROVE, WRITE_FLAG, [ALLOWANCE]],
-            [TRANSFER_FROM, READ_FLAG, [BALANCE_OF, ALLOWANCE]],
-            [TRANSFER_FROM, WRITE_FLAG, [BALANCE_OF, ALLOWANCE]]            
-        ]
-        lst2 = [
-            [TRANSFER, BALANCE_OF, READ_FLAG, [['msg.sender'], [0]]],
-            [TRANSFER, BALANCE_OF, WRITE_FLAG, [['msg.sender'], [0]]],
-            [APPROVE, ALLOWANCE, WRITE_FLAG, [['msg.sender', 0]]],
-            [TRANSFER_FROM, BALANCE_OF, READ_FLAG, [[0], [1]]],
-            [TRANSFER_FROM, BALANCE_OF, WRITE_FLAG, [[0], [1]]],
-            [TRANSFER_FROM, ALLOWANCE, READ_FLAG, [[0, 'msg.sender']]],
-            [TRANSFER_FROM, ALLOWANCE, WRITE_FLAG, [[0, 'msg.sender']]],
-        ]
-
-        if BURN in [f.name for f in self.funcs_write_state[BALANCE_OF]]:
-            func_burn = self.c.get_function_from_signature("burn(uint256)")
-            assert func_burn
-            self.funcs[BURN] = func_burn
-            lst.extend([
-                [BURN, READ_FLAG, [BALANCE_OF, TOTAL_SUPPLY]],
-                [BURN, WRITE_FLAG, [BALANCE_OF, TOTAL_SUPPLY]]
-            ])
-            lst2.extend([
-                [BURN, BALANCE_OF,READ_FLAG,[['msg.sender']]],
-                [BURN, BALANCE_OF,WRITE_FLAG,[['msg.sender']]]
-            ])
-            
-        if INCREASE_ALLOWANCE in [f.name for f in self.funcs_write_state[ALLOWANCE]]:
-            func_incr_allowance = self.c.get_function_from_signature("increaseAllowance(address,uint256)")
-            assert func_incr_allowance
-            self.funcs[INCREASE_ALLOWANCE] = func_incr_allowance
-            lst.extend([
-                [INCREASE_ALLOWANCE, READ_FLAG, [ALLOWANCE]],
-                [INCREASE_ALLOWANCE, WRITE_FLAG, [ALLOWANCE]]
-            ])
-            lst2.extend([
-                [INCREASE_ALLOWANCE, ALLOWANCE, READ_FLAG, [['msg.sender', 0]]],
-                [INCREASE_ALLOWANCE, ALLOWANCE, WRITE_FLAG, [['msg.sender', 0]]]
-            ])
+        allow_funcs = [self.func[e] for e in [E.transfer, E.transferFrom, E.burn] if e in self.func]
+        for f in self.funcs_write_balance:
+            if f not in allow_funcs:
+                print("未知方法 {} 对 {} 进行了写操作".format(f.name, self.balance.name))
         
-        if DECREASE_ALLOWANCE in [f.name for f in self.funcs_write_state[ALLOWANCE]]:
-            func_decr_allowance = self.c.get_function_from_signature("decreaseAllowance(address,uint256)")
-            assert func_decr_allowance
-            self.funcs[DECREASE_ALLOWANCE] = func_decr_allowance
-            lst.extend([
-                [DECREASE_ALLOWANCE, READ_FLAG, [ALLOWANCE]],
-                [DECREASE_ALLOWANCE, WRITE_FLAG, [ALLOWANCE]]
-            ])
-            lst2.extend([
-                [DECREASE_ALLOWANCE, ALLOWANCE, READ_FLAG, [['msg.sender', 0]]],
-                [DECREASE_ALLOWANCE, ALLOWANCE, WRITE_FLAG, [['msg.sender', 0]]]
-            ])
+        allow_funcs = [self.func[e] for e in [E.approve, E.transferFrom, E.increaseAllowance, E.decreaseAllowance] if e in self.func]
+        for f in self.funcs_write_allowance:
+            if f not in allow_funcs:
+                print("未知方法 {} 对 {} 进行了写操作".format(f.name, self.allowance.name))
 
-        for l in lst:
-            self._func_only_op_state(
-                self.funcs[l[0]],
-                l[1],
-                [self.states[item] for item in l[2]]
-            )
 
-        for l in lst2:
-            check_domain = []
-            for item in l[3]:
-                check_domain.append(
-                    [SolidityVariableComposed(v) if isinstance(v,str) else self.funcs[l[0]].parameters[v] for v in item]
-                )
-            self._check_mapping_detail(
-                self.funcs[l[0]],
-                self.states[l[1]],
-                l[2],
-                check_domain
-            )
+    def check_standard_func(self):
+        self._func_only_op_state(self.func[E.transfer], READ_FLAG, [self.balance])
+        self._func_only_op_state(self.func[E.transfer], WRITE_FLAG, [self.balance])
+        self._func_only_op_state(self.func[E.approve], READ_FLAG, [])
+        self._func_only_op_state(self.func[E.approve], WRITE_FLAG, [self.allowance])
+        self._func_only_op_state(self.func[E.transferFrom], READ_FLAG, [self.balance, self.allowance])
+        self._func_only_op_state(self.func[E.transferFrom], WRITE_FLAG, [self.balance, self.allowance])
 
+        self._check_mapping_detail(self.func[E.transfer], self.balance, READ_FLAG, [['msg.sender'], [0]])
+        self._check_mapping_detail(self.func[E.transfer], self.balance, WRITE_FLAG, [['msg.sender'], [0]])
+        self._check_mapping_detail(self.func[E.approve], self.allowance, WRITE_FLAG, [['msg.sender', 0]])
+        self._check_mapping_detail(self.func[E.transferFrom], self.balance, READ_FLAG, [[0], [1]])
+        self._check_mapping_detail(self.func[E.transferFrom], self.balance, WRITE_FLAG, [[0], [1]])
+        self._check_mapping_detail(self.func[E.transferFrom], self.allowance, READ_FLAG, [[0, 'msg.sender']])
+        self._check_mapping_detail(self.func[E.transferFrom], self.allowance, WRITE_FLAG, [[0, 'msg.sender']])
+
+        if E.burn in self.func:
+            self._func_only_op_state(self.func[E.burn], READ_FLAG, [self.balance, self.totalSupply])
+            self._func_only_op_state(self.func[E.burn], WRITE_FLAG, [self.balance, self.totalSupply])
+            self._check_mapping_detail(self.func[E.burn], self.balance, READ_FLAG, [['msg.sender']])
+            self._check_mapping_detail(self.func[E.burn], self.balance, WRITE_FLAG, [['msg.sender']])
+
+        if E.increaseAllowance in self.func:
+            self._func_only_op_state(self.func[E.increaseAllowance], READ_FLAG, [self.allowance])
+            self._func_only_op_state(self.func[E.increaseAllowance], WRITE_FLAG, [self.allowance])
+            self._check_mapping_detail(self.func[E.increaseAllowance], self.allowance, READ_FLAG, [['msg.sender', 0]])
+            self._check_mapping_detail(self.func[E.increaseAllowance], self.allowance, WRITE_FLAG, [['msg.sender', 0]])
+            
+        if E.decreaseAllowance in self.func:
+            self._func_only_op_state(self.func[E.decreaseAllowance], READ_FLAG, [self.allowance])
+            self._func_only_op_state(self.func[E.decreaseAllowance], WRITE_FLAG, [self.allowance])
+            self._check_mapping_detail(self.func[E.decreaseAllowance], self.allowance, READ_FLAG, [['msg.sender', 0]])
+            self._check_mapping_detail(self.func[E.decreaseAllowance], self.allowance, WRITE_FLAG, [['msg.sender', 0]])
 
     
-    def test_check_mapping_detail(self):
-        self._check_mapping_detail(
-            self.funcs[ALLOWANCE],
-            self.states[ALLOWANCE],
-            False,
-            [
-                [self.funcs[ALLOWANCE].parameters[0],self.funcs[ALLOWANCE].parameters[1]]
-            ]
-        )
-
     # 溢出检查
     # 1、编译器版本高于0.8.0
     # 2、使用库，这样的话，合约中并没有算术运算（只检查标准方法）
@@ -122,12 +67,10 @@ class Erc20Check(Erc20CheckBase):
             return
         
         funcs = []
-        # for f in set(self.funcs_write_state[BALANCE_OF] + self.funcs_write_state[ALLOWANCE]):
+        # for f in set(self.funcs_write_allowance + self.funcs_write_balance):
         #     funcs.extend(self._func_to_reachable_funcs(f))
-        # funcs = list(set(funcs))
-        for key in [TRANSFER, APPROVE, TRANSFER_FROM, BURN, INCREASE_ALLOWANCE,DECREASE_ALLOWANCE]:
-            if key in self.funcs:
-                funcs.extend(self._func_to_reachable_funcs(self.funcs[key]))
+        for func in self.func.values():
+            funcs.extend(self._func_to_reachable_funcs(func))
         funcs = list(set(funcs))
         for f in funcs:
             for n in f.nodes:
@@ -145,7 +88,7 @@ class Erc20Check(Erc20CheckBase):
     # 对可写balance和allowance的入口方法进行外部调用检查
     def check_call_other_contract(self):
         funcs = []
-        for f in set(self.funcs_write_state[BALANCE_OF] + self.funcs_write_state[ALLOWANCE]):
+        for f in set(self.funcs_write_allowance + self.funcs_write_balance):
             funcs.extend(self._func_to_reachable_funcs(f))
         funcs:List[Function] = list(set(funcs))
         for f in funcs:
@@ -157,6 +100,7 @@ class Erc20Check(Erc20CheckBase):
                             continue
                         print(" {} 方法中的 {} 存在外部调用风险".format(f.name,node.expression))
 
+    # 若程序中带有sload和sstore的汇编指令，则其行为具有很大的不确定性
     def check_sstore(self):
         funcs = []
         for f in self.c.functions_entry_points:
@@ -166,7 +110,8 @@ class Erc20Check(Erc20CheckBase):
             self._func_has_asm_sstore(f)
             self._func_has_asm_sload(f)
 
+    # 假充值
     def check_fake_recharge(self):
-        self._check_fake_recharge(self.funcs[TRANSFER])
+        self._check_fake_recharge(self.func[E.transfer])
 
 

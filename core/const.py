@@ -18,20 +18,6 @@ class E(Enum):
     burn = "burn(uint256)", False, False, 7
     increaseAllowance = "increaseAllowance(address,uint256)", False, False, 8
     decreaseAllowance = "decreaseAllowance(address,uint256)", False, False, 9
-# 下一步基于枚举重构代码
-    
-
-TOTAL_SUPPLY = "totalSupply"
-BALANCE_OF = "balanceOf"
-ALLOWANCE = "allowance"
-
-TRANSFER = "transfer"
-APPROVE = "approve"
-TRANSFER_FROM = "transferFrom"
-
-BURN = "burn"
-INCREASE_ALLOWANCE = "increaseAllowance"
-DECREASE_ALLOWANCE = "decreaseAllowance"
 
 
 READ_FLAG = False

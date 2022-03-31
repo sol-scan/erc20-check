@@ -10,14 +10,14 @@ class Chain(Enum):
         obj.url = url
         obj._value_ = index
         return obj
-    Eth = "http://api.etherscan.io/api", 0
-    Bsc = "http://api.bscscan.com/api", 1
+    Eth = "http://api.etherscan.io/api", 1
+    Bsc = "http://api.bscscan.com/api", 56
 
-def download_sourceCode(chain:Chain,addr:str,contract_name:str):
-    dir_path = './sols/'+ '_'.join([contract_name, chain.name.lower(), addr[-8:].lower()])
+def download_sourceCode(chain:Chain,addr:str,token_name:str) -> str:
+    dir_path = './sols/'+ '_'.join([token_name, chain.name.lower(), addr[-8:].lower()])
     if os.path.exists(dir_path):
         if len(os.listdir(dir_path)) > 0:
-            return
+            return dir_path
     else:
         os.makedirs(dir_path)
 
@@ -46,3 +46,4 @@ def download_sourceCode(chain:Chain,addr:str,contract_name:str):
     else:
         with open(dir_path+'/'+raw_contract_info['ContractName']+'.sol','w') as fp:
             fp.write(raw_source_info + "\n\n")
+    return dir_path

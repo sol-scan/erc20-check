@@ -1,4 +1,4 @@
-from typing import List, Mapping, Tuple
+from typing import List, Mapping
 from slither.core.declarations import Contract, Function, SolidityVariableComposed
 from slither.core.variables.state_variable import StateVariable
 from slither.core.cfg.node import NodeType,Node
@@ -10,37 +10,44 @@ from .const import *
 class Erc20CheckBase:
     def __init__(self, c: Contract):
         self.c: Contract = c
-        self.funcs: Mapping[str, Function] = {}
-        self.states: Mapping[str, StateVariable] = {}
-        self.funcs_write_state: Mapping[str, List[Function]] = {}
+        self.func: Mapping[E,Function] = {}
+        for e in E._member_map_.values():
+            f:Function = self.c.get_function_from_signature(e.sign)
+            if e.is_required:
+                assert f
+            if f:
+                self.func[e] = f
+                assert self.func[e] in c.functions_entry_points
+                if e.is_view:
+                    assert self.func[e].view
+
+        assert len(self.func[E.totalSupply].state_variables_read) == 1
+        self.totalSupply: StateVariable = self.func[E.totalSupply].state_variables_read[0]
+
+        assert len(self.func[E.balanceOf].state_variables_read) == 1
+        self.balance: StateVariable = self.func[E.balanceOf].state_variables_read[0]
+
+        assert len(self.func[E.allowance].state_variables_read) == 1
+        self.allowance: StateVariable = self.func[E.allowance].state_variables_read[0]
+
         # 根据调用情况查询某一可达到的方法列表
         self.func_to_reachable_funcs: Mapping[str, List[Function]] = {}
-        # self.func_to_reachable_paths: Mapping[str,Mapping[str,List[Function]]] = {}
 
-        self.funcs[TOTAL_SUPPLY] = c.get_function_from_signature(
-            'totalSupply()')
-        self.funcs[BALANCE_OF] = c.get_function_from_signature(
-            'balanceOf(address)')
-        self.funcs[ALLOWANCE] = c.get_function_from_signature(
-            'allowance(address,address)')
-        self.funcs[TRANSFER] = c.get_function_from_signature(
-            'transfer(address,uint256)')
-        self.funcs[APPROVE] = c.get_function_from_signature(
-            'approve(address,uint256)')
-        self.funcs[TRANSFER_FROM] = c.get_function_from_signature(
-            'transferFrom(address,address,uint256)')
-        for k in [TOTAL_SUPPLY, BALANCE_OF, ALLOWANCE, TRANSFER, APPROVE, TRANSFER_FROM]:
-            assert self.funcs[k] and self.funcs[k] in c.functions_entry_points
+        self.funcs_write_balance:List[Function] = self.__get_funcs_write_the_state(self.balance)
+        self.funcs_write_allowance:List[Function] = self.__get_funcs_write_the_state(self.allowance)
 
-        for k in [TOTAL_SUPPLY, BALANCE_OF, ALLOWANCE]:
-            assert len(self.funcs[k].state_variables_read) == 1 and self.funcs[k].view
-            self.states[k] = self.funcs[k].state_variables_read[0]
 
-        self.funcs_write_state[BALANCE_OF] = self.__get_funcs_write_the_state(
-            self.states[BALANCE_OF])
-        self.funcs_write_state[ALLOWANCE] = self.__get_funcs_write_the_state(
-            self.states[ALLOWANCE])
-
+    # 获取哪些可外部访问的方法对指定state进行了写操作
+    def __get_funcs_write_the_state(self, s: StateVariable) -> List[Function]:
+        fs = []
+        for f in self.c.functions_entry_points:
+            if not f.is_constructor:
+                for ff in self._func_to_reachable_funcs(f):
+                    if s in ff.state_variables_written:
+                        fs.append(f)
+                        break
+        return fs
+    
     # 迭代获取方法可达到的方法列表
     def _func_to_reachable_funcs(self,f:Function)->List[Function]:
         if  f.full_name not in self.func_to_reachable_funcs:
@@ -59,18 +66,7 @@ class Erc20CheckBase:
             self.func_to_reachable_funcs[f.full_name] = list(set(res))
         return self.func_to_reachable_funcs[f.full_name]
 
-    # 获取哪些可外部访问的方法对指定state进行了写操作
-    def __get_funcs_write_the_state(self, s: StateVariable) -> List[Function]:
-        fs = []
-        for f in self.c.functions_entry_points:
-            if not f.is_constructor:
-                for ff in self._func_to_reachable_funcs(f):
-                    if s in ff.state_variables_written:
-                        fs.append(f)
-                        break
-        return fs
-
-    # 判断某方法是否只读取了指定的state
+    # 判断某方法是否只读取或写入了指定的state
     def _func_only_op_state(self, f: Function, is_write:bool, obj_indexs: List) -> bool:
         indexs = []
         for ff in self._func_to_reachable_funcs(f):
@@ -92,41 +88,13 @@ class Erc20CheckBase:
                     "写入" if is_write else "读取"
                 ))
 
-    def _func_has_asm_sload(self,f:Function) -> bool:
-        for node in f.nodes:
-            for ir in node.irs:
-                if isinstance(ir, SolidityCall) and ir.function.name == "sload":
-                    print(" {} 使用了 asm 的 sload ，功能未知".format(f.name,))
-                    return True
-        return False
-    def _func_has_asm_sstore(self,f:Function) -> bool:
-        for node in f.nodes:
-            for ir in node.irs:
-                if isinstance(ir, SolidityCall) and ir.function.name == "sstore":
-                    print(" {} 使用了 asm 的 sstore ，功能未知".format(f.name,))
-                    return True
-        return False
-
-    # 对写指定state的方法进行分类
-    def _check_close(self, key: str, standard_fnames, extend_fnames) -> Tuple[List[str], List[str]]:
-        extends = []
-        others = []
-        for f in self.funcs_write_state[key]:
-            if f.name in standard_fnames:
-                pass
-            elif f.name in extend_fnames:
-                extends.append(f.name)
-            else:
-                others.append(f.name)
-        # if len(extends) > 0:
-        #     print("拓展方法 {} 对 {} 进行了写操作".format(
-        #         ",".join(extends), self.states[key].name))
-        if len(others) > 0:
-            print("未知方法 {} 对 {} 进行了写操作".format(
-                ",".join(others), self.states[key].name))
-        return extends, others
-
     def _check_mapping_detail(self,f:Function,s:StateVariable,is_write:bool,obj_indexss):
+        # obj_indexss中的内容只需要为字符串("msg.sender")或者参数位置
+        for i in range(len(obj_indexss)):
+            for j in range(len(obj_indexss[i])):
+                v = obj_indexss[i][j]
+                obj_indexss[i][j] = SolidityVariableComposed(v) if isinstance(v,str) else f.parameters[v]
+
         depth = str(s.type).count("mapping")
         indexss = self.__get_mapping_indexs_op_by_func(f,s,is_write,depth)
         for indexs in indexss:
@@ -156,15 +124,6 @@ class Erc20CheckBase:
                 if match:
                     return True
         return False
-    
-    # 根据 node、起始i、mapping、获取mapping的索引
-    def __get_mapping_index_v(self, n:Node, start_i:int, m_v):
-        for i in range(start_i, len(n.irs)):
-            ir = n.irs[i]
-            if isinstance(ir, Index) and ir.variable_left == m_v:
-                return self.__get_v_maybe_msgSender_func(n,i,ir.variable_right),ir.lvalue,i+1
-        assert False
-        
     # 获取方法对mapping变量读写的细节
     def __get_mapping_indexs_op_by_func(self,f:Function,s:StateVariable,is_write:bool,depth:int)->List[List]:
         # depth = str(s.type).count("mapping")
@@ -189,8 +148,14 @@ class Erc20CheckBase:
                                 if ic_rets[m][mm] == ir.function.parameters[l]:
                                     ic_rets[m][mm] = self.__get_v_maybe_msgSender_func(n,i,ir.arguments[l]) 
                     indexss.extend(ic_rets)
-        return indexss
-    
+        return indexss    
+    # 根据 node、起始i、mapping、获取mapping的索引
+    def __get_mapping_index_v(self, n:Node, start_i:int, m_v):
+        for i in range(start_i, len(n.irs)):
+            ir = n.irs[i]
+            if isinstance(ir, Index) and ir.variable_left == m_v:
+                return self.__get_v_maybe_msgSender_func(n,i,ir.variable_right),ir.lvalue,i+1
+        assert False
     def __get_v_maybe_msgSender_func(self,n:Node,i:int,v):
         # _msgSender() 的问题，简化处理，直接返回msg.sender
         if isinstance(v, TemporaryVariable):
@@ -208,8 +173,21 @@ class Erc20CheckBase:
                 return_nodes.append(n)
         return len(return_nodes) == 1 and str(return_nodes[0].expression)=="msg.sender"
 
+    def _func_has_asm_sload(self,f:Function) -> bool:
+        for node in f.nodes:
+            for ir in node.irs:
+                if isinstance(ir, SolidityCall) and ir.function.name == "sload":
+                    print(" {} 使用了 asm 的 sload ，功能未知".format(f.name,))
+                    return True
+        return False
+    def _func_has_asm_sstore(self,f:Function) -> bool:
+        for node in f.nodes:
+            for ir in node.irs:
+                if isinstance(ir, SolidityCall) and ir.function.name == "sstore":
+                    print(" {} 使用了 asm 的 sstore ，功能未知".format(f.name,))
+                    return True
+        return False
 
-    # 假充值检查，transfer返回FALSE时存在假充值风险
     def _check_fake_recharge(self, f:Function):
         intercall_irs = []
         for n in f.nodes:
