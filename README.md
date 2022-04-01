@@ -18,9 +18,8 @@
 在项目根目录运行 `python main.py`  
 程序运行基于配置文件 `config.ini` ，位于 `main.py` 同级目录，内容如下  
 ```ini
-; 目前支持ETH、BSC，分别为1、56
 [download]
-chain_id = 56
+chain_id = 56 ; 目前支持ETH、BSC，分别为1、56
 token_address = 0xb0d502e938ed5f4df2e681fe6e419ff29631d62b
 token_name = STG
 
