@@ -9,3 +9,23 @@
 5. 外部调用检查
 6. 自动下载链上已验证代码到本地
 7. 假充值检查
+
+## 正常运行依赖组件
+1. solidity静态扫描工具slither， `pip install slither`
+2. 与目标sol文件匹配的solidity编译器，可以使用 `solc-select` 进行管理， `pip install solc-select`
+
+## 运行
+在项目根目录运行 `python main.py`  
+程序运行基于配置文件 `config.ini` ，位于 `main.py` 同级目录，内容如下  
+```ini
+; 目前支持ETH、BSC，分别为1、56
+[download]
+chain_id = 56
+token_address = 0xb0d502e938ed5f4df2e681fe6e419ff29631d62b
+token_name = STG
+
+[check]
+is_single = False
+contract_name = StargateToken
+```
+
