@@ -12,6 +12,8 @@ class Chain(Enum):
         return obj
     Eth = "http://api.etherscan.io/api", 1
     Bsc = "http://api.bscscan.com/api", 56
+    XAVA = "http://api.snowtrace.io/api", 43114
+
 
 def download_sourceCode(chain:Chain,addr:str,token_name:str) -> str:
     dir_path = './sols/'+ '_'.join([token_name, chain.name.lower(), addr[-8:].lower()])
