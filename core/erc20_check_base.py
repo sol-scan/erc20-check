@@ -12,23 +12,16 @@ class Erc20CheckBase:
         self.c: Contract = c
         self.func: Mapping[E,Function] = {}
         for e in E._member_map_.values():
-            f:Function = self.c.get_function_from_signature(e.sign)
+            f = c.get_function_from_signature(e.sign)            
             if e.is_required:
                 assert f
             if f:
+                assert f in c.functions_entry_points
                 self.func[e] = f
-                assert self.func[e] in c.functions_entry_points
-                if e.is_view:
-                    assert self.func[e].view
-
-        assert len(self.func[E.totalSupply].state_variables_read) == 1
-        self.totalSupply: StateVariable = self.func[E.totalSupply].state_variables_read[0]
-
-        assert len(self.func[E.balanceOf].state_variables_read) == 1
-        self.balance: StateVariable = self.func[E.balanceOf].state_variables_read[0]
-
-        assert len(self.func[E.allowance].state_variables_read) == 1
-        self.allowance: StateVariable = self.func[E.allowance].state_variables_read[0]
+        
+        self.totolSupply = self.__get_view_state(E_view.totalSupply)
+        self.balance = self.__get_view_state(E_view.balanceOf)
+        self.allowance = self.__get_view_state(E_view.allowance)
 
         # 根据调用情况查询某一可达到的方法列表
         self.func_to_reachable_funcs: Mapping[str, List[Function]] = {}
@@ -36,6 +29,19 @@ class Erc20CheckBase:
         self.funcs_write_balance:List[Function] = self.__get_funcs_write_the_state(self.balance)
         self.funcs_write_allowance:List[Function] = self.__get_funcs_write_the_state(self.allowance)
 
+    def __get_view_state(self, e_view: E_view) -> StateVariable:
+        """
+        get the state which is based by totalSupply, balanceOf, allowance
+        """
+        f = self.c.get_function_from_signature(e_view.sign)
+        if f:
+            assert len(f.state_variables_read) == 1
+            return f.state_variables_read[0]
+        else:
+            for s in self.c.state_variables:
+                if s.name == e_view.name:
+                    return s
+            assert False, "the informantion about {} can not be found".format(e_view.name)
 
     # 获取哪些可外部访问的方法对指定state进行了写操作
     def __get_funcs_write_the_state(self, s: StateVariable) -> List[Function]:
