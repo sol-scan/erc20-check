@@ -19,7 +19,7 @@ class Erc20CheckBase:
                 assert f in c.functions_entry_points
                 self.func[e] = f
         
-        self.totolSupply = self.__get_view_state(E_view.totalSupply)
+        self.totalSupply = self.__get_view_state(E_view.totalSupply)
         self.balance = self.__get_view_state(E_view.balanceOf)
         self.allowance = self.__get_view_state(E_view.allowance)
 
