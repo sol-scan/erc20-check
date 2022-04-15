@@ -21,14 +21,8 @@ if __name__ == "__main__":
     contract_dir, check_conf = download_sourceCode(chain, token_address, token_name)
     os.chdir(contract_dir)
 
-    # now_check = config.getboolean('check','now_check')
-    # if now_check:
     is_single = check_conf.getboolean('info','is_single')
-    contract_name = check_conf.get('info','contract_name')
-    # if contract_name.strip() == "":
-    #     print("请配置合约名")
-    # else:
-    contract_path = contract_name + '.sol'
+    contract_path = check_conf.get('info','contract_name') + '.sol'
     if not is_single:
         contract_path = 'contracts/' + contract_path
     slither = Slither(contract_path)
