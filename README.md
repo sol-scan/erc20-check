@@ -24,9 +24,5 @@ chain_id = 56 ; 目前支持ETH、BSC、XAVA，分别为1、56、43314
 token_address = 0xb0d502e938ed5f4df2e681fe6e419ff29631d62b
 token_name = STG
 
-[check]
-now_check = False ; 是否进行检查
-is_single = False ; 下载的内容是否为单个文件
-contract_name = StargateToken ; token对应的合约名
 ```
 
