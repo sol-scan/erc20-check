@@ -3,7 +3,8 @@ import os
 from slither import Slither
 import sys
 sys.path.append('.')
-from core.download import Chain, download_sourceCode
+from core.const import Chain
+from core.download import  download_sourceCode
 from core.erc20_check import Erc20Check
 
 if __name__ == "__main__":
@@ -21,10 +22,7 @@ if __name__ == "__main__":
     contract_dir, check_conf = download_sourceCode(chain, token_address, token_name)
     os.chdir(contract_dir)
 
-    is_single = check_conf.getboolean('info','is_single')
-    contract_path = check_conf.get('info','contract_name') + '.sol'
-    if not is_single:
-        contract_path = 'contracts/' + contract_path
+    contract_path = check_conf.get('info','contract_path')
     slither = Slither(contract_path)
     for c in slither.contracts_derived:
         if c.kind!="contract":

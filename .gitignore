@@ -131,3 +131,4 @@ dmypy.json
 temp
 sols
 config.ini
+core/key.ini
