@@ -1,4 +1,4 @@
-# erc20-check
+# erc20-check  已整合到`audit-helper`中，后期不再维护
 
 ## 当前已实现：
 
