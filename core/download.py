@@ -49,6 +49,7 @@ def download_sourceCode(chain:Chain,addr:str,token_name:str) -> Tuple[str, Confi
             with open(full_file_name,'w') as fp:
                 fp.write(source_info['content'] + "\n\n")
     else:
+        check_conf.set('info','contract_path',contract_file_name)
         with open(dir_path+'/'+contract_file_name,'w') as fp:
             fp.write(raw_source_info + "\n\n")
     with open(conf_file,'w') as fp:
